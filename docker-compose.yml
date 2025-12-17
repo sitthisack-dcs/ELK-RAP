@@ -1,0 +1,46 @@
+version: "3"
+services:
+    elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.2.1
+        environment:
+            discovery.type: single-node
+            indices.query.bool.max_clause_count: 4000
+            xpack.security.enabled: false
+            xpack.security.enrollment.enabled: false
+        ports:
+            - "9200:9200"
+        networks:
+            - elastic
+    kibana:
+        image: docker.elastic.co/kibana/kibana:9.2.1
+        ports:
+            - "5601:5601"
+        environment:
+            ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+        networks:
+            - elastic
+        depends_on:
+            - elasticsearch
+    filebeat:
+        image: docker.elastic.co/beats/filebeat:9.2.1
+        user: root
+        command: filebeat -e --strict.perms=false
+        volumes:
+            - ./malware-traffic-analysis.net:/logs:ro
+            - ./filebeat-config/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+            - ./filebeat-config/suricata.yml:/usr/share/filebeat/modules.d/suricata.yml:ro
+        networks:
+            - elastic
+        depends_on:
+            - elasticsearch
+            - kibana
+    loader:
+        build: .
+        volumes:
+            - .:/datasets
+        networks:
+            - elastic
+        depends_on:
+            - elasticsearch
+networks:
+    elastic:
